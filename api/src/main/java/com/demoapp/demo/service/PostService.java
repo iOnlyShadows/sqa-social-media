@@ -61,7 +61,8 @@ public class PostService {
         post.put("title", postNode.get("title").asText());
         post.put("body", postNode.get("body").asText());
         post.put("liked", likedPostIds.contains(postId));
-        
+        post.put("reactions", extractReactions(postNode));
+
         posts.add(post);
       }
 
@@ -108,7 +109,8 @@ public class PostService {
         post.put("title", postNode.get("title").asText());
         post.put("body", postNode.get("body").asText());
         post.put("liked", true);
-        
+        post.put("reactions", extractReactions(postNode));
+
         posts.add(post);
       }
 
@@ -143,8 +145,23 @@ public class PostService {
     Map<String, Object> result = new HashMap<>();
     result.put("postId", postId);
     result.put("liked", liked);
-    
+
     return result;
+  }
+
+  /**
+   * Extrai as reações (likes e dislikes) de um post vindo da API do DummyJSON.
+   * No DummyJSON, as reações ficam encapsuladas no objeto "reactions".
+   * Se o campo não existir, retorna zero para evitar erro.
+   */
+  private Map<String, Object> extractReactions(JsonNode postNode) {
+    JsonNode reactionsNode = postNode.get("reactions");
+    Map<String, Object> reactions = new HashMap<>();
+    reactions.put("likes",
+        reactionsNode != null && reactionsNode.has("likes") ? reactionsNode.get("likes").asInt() : 0);
+    reactions.put("dislikes",
+        reactionsNode != null && reactionsNode.has("dislikes") ? reactionsNode.get("dislikes").asInt() : 0);
+    return reactions;
   }
 
 }
