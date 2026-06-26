@@ -1,0 +1,6 @@
+# Configuração do editor Obsidian (não faz parte do projeto)
+.obsidian/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db

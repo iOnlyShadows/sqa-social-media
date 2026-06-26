@@ -1,0 +1,135 @@
+name: CI
+
+# Gatilho obrigatório: roda sempre que um Pull Request for aberto ou atualizado
+# com destino à branch main.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JOB 1 — Testes de caixa-branca (unidade/integração), sem precisar de banco.
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Testes unitários (client + api)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Testes do backend (JUnit)
+        working-directory: api
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências do client
+        working-directory: client
+        run: npm ci
+
+      - name: Testes do frontend (Jest)
+        working-directory: client
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # JOB 2 — Testes de caixa-preta (E2E e API com Playwright).
+  # Sobe MySQL + API + client e roda a suíte contra o sistema em execução.
+  # Só roda se o job unit-tests passar (needs).
+  # ---------------------------------------------------------------------------
+  e2e-tests:
+    name: Testes E2E e de API (Playwright)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+
+    # Banco de dados MySQL para a API (serviço do pipeline).
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sqa_social_media
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Empacotar e subir o backend (API)
+        working-directory: api
+        env:
+          DB_URL: jdbc:mysql://127.0.0.1:3306/sqa_social_media
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -DskipTests package
+          nohup java -jar target/*.jar > api.log 2>&1 &
+          echo "Aguardando a API em http://localhost:8080 ..."
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:8080/posts?limit=1" > /dev/null; then
+              echo "API no ar."; break
+            fi
+            sleep 3
+          done
+
+      - name: Buildar e subir o frontend (client)
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+          nohup npm start > client.log 2>&1 &
+          echo "Aguardando o frontend em http://localhost:3000 ..."
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:3000" > /dev/null; then
+              echo "Frontend no ar."; break
+            fi
+            sleep 3
+          done
+
+      - name: Instalar Playwright e o navegador
+        working-directory: tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Rodar a suíte E2E e de API
+        working-directory: tests
+        run: npx playwright test
+
+      - name: Publicar o relatório do Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/playwright-report/
+          retention-days: 7
