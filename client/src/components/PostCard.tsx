@@ -80,11 +80,21 @@ export default function PostCard({
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           alignItems: "center",
           marginTop: "1rem",
         }}
       >
+        {/* Feature (Atividade 6): exibe a contagem de likes e dislikes do post,
+            vinda do objeto "reactions" da API. Usa ?? 0 caso o dado não exista. */}
+        <div
+          aria-label="reactions"
+          style={{ display: "flex", gap: "1rem", color: "var(--foreground)" }}
+        >
+          <span aria-label="likes">👍 {post.reactions?.likes ?? 0}</span>
+          <span aria-label="dislikes">👎 {post.reactions?.dislikes ?? 0}</span>
+        </div>
+
         <button
           onClick={handleLike}
           disabled={isLoading}

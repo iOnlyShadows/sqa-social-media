@@ -53,4 +53,23 @@ describe("<PostCard /> (componente isolado)", () => {
     
     alertMock.mockRestore();
   });
+
+  // TESTE (Atividade 6): o card deve exibir a contagem de likes e dislikes.
+  it("exibe o número de likes e dislikes do post", () => {
+    const postComReacoes: Post = {
+      id: 2,
+      title: "Post com reações",
+      body: "Corpo",
+      liked: false,
+      reactions: { likes: 42, dislikes: 5 },
+    };
+
+    render(
+      <PostCard post={postComReacoes} isAuthenticated={false} onLike={jest.fn()} />
+    );
+
+    // Os números de likes e dislikes devem aparecer na tela.
+    expect(screen.getByText(/42/)).toBeInTheDocument();
+    expect(screen.getByText(/5/)).toBeInTheDocument();
+  });
 });
